@@ -1,0 +1,23 @@
+{
+    "annulus": {
+        "anteriorposteriodiameter [mm]": 38.02983474731445,
+        "mediallateraldiameter [mm]": 35.96678161621094,
+        "commissuralwidth [mm]": 34.380621406748936,
+        "annularheight [mm]": 9.45460577827402,
+        "annularcircumference [mm]": 122.0244140625,
+        "annulararea2d [mm^2]": 1086.128053834045,
+        "annulararea [mm^2]": 1122.9941331189966
+    },
+    "lealet": {
+        "anterior": {
+            "leafletlength [mm]": 25.655336380004883,
+            "leafletheight [mm]": 7.646640034050424,
+            "leafletarea [mm^2]": 798.52627877487
+        },
+        "posterior": {
+            "leafletlength [mm]": 14.195778846740723,
+            "leafletheight [mm]": 6.652636562193375,
+            "leafletarea [mm^2]": 811.948169342759
+        }
+    }
+}
