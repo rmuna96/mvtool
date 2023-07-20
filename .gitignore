@@ -7,5 +7,5 @@ __pycache__/
 .idea
 
 # Input and output folders
-./src/images
-./src/metrics
+src/images
+src/metrics
