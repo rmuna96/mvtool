@@ -17,7 +17,6 @@ from utils import (
     soapfilmannulusinterpolation,
     planefit,
     clmodeling,
-    anter_postsplit,
     distancebtwpolydata)
 
 
@@ -29,10 +28,10 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     """
     coaptationline, saddlehorn = clmodeling(bestfitplane, annulus_skeleton, aleaflet_pd, n, ctr, plot=False)
 
-    _, saddlehorn_onplane = bestfitplane.find_closest_cell(saddlehorn, return_closest_point=True)
+    _, projected_point = bestfitplane.find_closest_cell(saddlehorn, return_closest_point=True)
 
     # ---> Define clipping planes
-    direction = ctr - saddlehorn_onplane
+    direction = ctr - projected_point
     medial_lateralplane = referenceplane.copy()
     medial_lateralplane.rotate_vector(vector=direction, angle=90, point=ctr, inplace=True)
     anterior_posteriorplane = medial_lateralplane.copy()
@@ -45,15 +44,13 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     lateral_pt, medial_pt = annulusanterior_pd.points[0], annulusanterior_pd.points[-1]
 
     # ---> Find posterior horn
-    posteriorhorn = annulusposterior_pd.slice(normal=medial_lateralplane.face_normals[0]).points[0]
+    posteriorhorn = annulusposterior_pd.slice(normal=medial_lateralplane.face_normals[0]).points
 
-    _, posteriorhorn_onplane = bestfitplane.find_closest_cell(posteriorhorn, return_closest_point=True)
+    # ---> Find lateral horn
+    _, medialcommisure_pt = annulus_skeleton.find_closest_cell(coaptationline.points[0], return_closest_point=True)
 
-    # ---> Define anterior and posterior portion (2/5 - 3/5 rule)
-    medialcommisure_pt, lateralcommisure_pt = anter_postsplit(annulus_skeleton, ctr, n, direction,
-                                                              anterior_posteriorplane, plot=False)
-
-    cw_midpt = 0.5 * (medialcommisure_pt + lateralcommisure_pt)
+    # ---> Find medial horn
+    _, lateralcommisure_pt = annulus_skeleton.find_closest_cell(coaptationline.points[-1], return_closest_point=True)
 
     # ---> Find anterior point, coaptation point and anteriorLeaflet length
     direction = saddlehorn - posteriorhorn
@@ -65,33 +62,23 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     cpoint_idx = np.argmax(np.linalg.norm(aleaflet_slice.points - saddlehorn, axis=1))
     aleaflet_cpoint = aleaflet_slice.points[cpoint_idx]
 
-    # ---> Find posterior point, leaflet coaptation point
+    # ---> Find posterior point, coaptation point
     pleaflet_slice = pleaflet_pd.slice(normal=medial_lateralplane.face_normals[0])
     cpoint_idx = np.argmax(np.linalg.norm(pleaflet_slice.points - posteriorhorn, axis=1))
     pleaflet_cpoint = pleaflet_slice.points[cpoint_idx]
 
-    # ---> Find coaptation point
-    _, clpts_onplane = bestfitplane.find_closest_cell(coaptationline.points, return_closest_point=True)
-    coapt_pt = coaptationline.points[np.argmax(np.linalg.norm(coaptationline.points - clpts_onplane, axis=1))]
-
     landmarks = {
         "annulus": {
             "saddlehorn": saddlehorn,
-            "saddlehornonplane": saddlehorn_onplane,
             "posteriorhorn": posteriorhorn,
-            "posteriorhornonplane": posteriorhorn_onplane,
             "lateralpt": lateral_pt,
             "medialpt": medial_pt,
             "medialcommisurept": medialcommisure_pt,
             "lateralcommisurept": lateralcommisure_pt,
-            "cwmidpt": cw_midpt,
         },
         "leaflet": {
             "aleafletcpoint": aleaflet_cpoint,
             "pleafletcpoint": pleaflet_cpoint,
-            "clpoints": coaptationline.points,
-            "clptsonplane": clpts_onplane,
-            "coaptpt": coapt_pt,
         }
     }
 
@@ -107,30 +94,29 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
 
         pl = pv.Plotter()
         pl.add_mesh(annulus_skeleton)
-        pl.add_points(medialcommisure_pt, label="medialcommisure")
-        pl.add_points(lateralcommisure_pt, label="lateralcommisure")
-        pl.add_points(cw_midpt, label="cwmidpoint")
-        pl.add_points(lateral_pt, label="lateralpt")
-        pl.add_points(medial_pt, label="medialpt")
-        pl.add_points(saddlehorn, label="saddlehorn")
-        pl.add_points(posteriorhorn, label="posteriorhorn")
-        pl.add_points(saddlehorn_onplane, label="shonplane")
-        pl.add_points(posteriorhorn_onplane, label="phonplane")
-        pl.add_points(aleaflet_cpoint, label="aleafletcpt")
-        pl.add_points(pleaflet_cpoint, label="pleafletcpt")
-        pl.add_points(coapt_pt, label="coaptpt")
+        pl.add_points(medialcommisure_pt)
+        pl.add_points(lateralcommisure_pt)
+        pl.add_points(lateral_pt)
+        pl.add_points(medial_pt)
+        pl.add_points(saddlehorn)
+        pl.add_points(posteriorhorn)
+        pl.add_points(aleaflet_cpoint)
+        pl.add_points(pleaflet_cpoint)
         pl.add_mesh(annulus_bb.extract_feature_edges(90))
-        pl.add_legend()
         pl.show()
 
     return landmarks
 
 
-def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ctr, r, referenceplane,
+def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, referenceplane,
                           aleaflet_pd, pleaflet_pd, landmarks, odir, folder, name):
     """
         Quantify mitral valve morphology.
     """
+    # ---> Compute leaflet height respect to 3D annulus plane
+    aleaflet_pd, aleafletheight = distancebtwpolydata(aleaflet_pd, soapfilmannulus)
+    pleaflet_pd, pleafletheight = distancebtwpolydata(pleaflet_pd, soapfilmannulus)
+
 
     # ---> Compute antero-posterior diameter and commissural width
     anteriorposteriod = np.linalg.norm(landmarks["annulus"]["saddlehorn"] - landmarks["annulus"]["posteriorhorn"])
@@ -152,68 +138,23 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
 
     annularheight = highest_positived - highest_negatived
 
-    # ---> Compute inter-trigonal distance
-    itdist = 19.280 * np.exp(2 * mediallaterald)    #compute according [2]
-
-    # ---> Comnpute sphericity index
-    ci = anteriorposteriod/commissuralwidth
-
-    # ---> Compute non-planar angle
-    ba = landmarks["annulus"]["cwmidpt"] - landmarks["annulus"]["saddlehorn"]
-    bc = landmarks["annulus"]["cwmidpt"] - landmarks["annulus"]["posteriorhorn"]
-
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-    NPA = np.arccos(cosine_angle) * 180/np.pi
-
     # ---> Compute anterior leaflet length
     aleafletlength = np.linalg.norm(landmarks["annulus"]["saddlehorn"] - landmarks["leaflet"]["aleafletcpoint"])
 
     # ---> Compute posterior leaflet length
     pleafletlength = np.linalg.norm(landmarks["annulus"]["posteriorhorn"] - landmarks["leaflet"]["pleafletcpoint"])
 
-    # ---> Compute leaflet height respect to 3D annulus plane
-    aleaflet_pd, aleafletheight = distancebtwpolydata(aleaflet_pd, soapfilmannulus)
-    pleaflet_pd, pleafletheight = distancebtwpolydata(pleaflet_pd, soapfilmannulus)
-
     # ---> Compute leaflet surface area
     aleafletarea = aleaflet_pd.area / 2
     pleafletarea = pleaflet_pd.area / 2
-
-    # ---> Compute tenting height, tenting area and tentng volume
-
-    tentingheight = np.max(np.linalg.norm(landmarks["leaflet"]["clpoints"] -
-                                                                         landmarks["leaflet"]["clptsonplane"], axis=1))
-    tentingarea = pv.PolyData([
-        landmarks["annulus"]["saddlehornonplane"],
-        landmarks["annulus"]["posteriorhornonplane"],
-        landmarks["leaflet"]["coaptpt"],
-    ], strips=[3, 1, 2, 3]).area
-
-    tentingvolume = 1/3 * np.pi * r ** 2 * np.dot(-n, (landmarks["leaflet"]["coaptpt"]-ctr)/np.linalg.norm(
-        landmarks["leaflet"]["coaptpt"]-ctr)) * np.linalg.norm(landmarks["leaflet"]["coaptpt"]-ctr)
-
-    ba = landmarks["annulus"]["saddlehornonplane"] - landmarks["leaflet"]["coaptpt"]
-    bc = landmarks["annulus"]["saddlehornonplane"] - landmarks["annulus"]["posteriorhornonplane"]
-
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-    aleafletangle = np.arccos(cosine_angle) * 180 / np.pi
-
-    ba = landmarks["annulus"]["posteriorhornonplane"] - landmarks["leaflet"]["coaptpt"]
-    bc = landmarks["annulus"]["posteriorhornonplane"] - landmarks["annulus"]["saddlehornonplane"]
-
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-    pleafletangle = np.arccos(cosine_angle) * 180 / np.pi
 
     metrics = {
         "annulus": {
             "anteriorposteriodiameter [mm]": anteriorposteriod.astype('float64'),
             "mediallateraldiameter [mm]": mediallaterald.astype('float64'),
-            "intertrigonaldist [mm]": itdist.astype('float64'),
             "commissuralwidth [mm]": commissuralwidth.astype('float64'),
             "annularheight [mm]": annularheight.astype('float64'),
             "annularcircumference [mm]": annularcirc.astype('float64'),
-            "sphericityindex": ci.astype('float64'),
-            "nonplanarangle [deg]": NPA.astype('float64'),
             "annulararea2d [mm^2]": annulararea2d.astype('float64'),
             "annulararea [mm^2]": annulararea.astype('float64'),
         },
@@ -222,18 +163,11 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
                 "leafletlength [mm]": aleafletlength.astype('float64'),
                 "leafletheight [mm]": aleafletheight.astype('float64'),
                 "leafletarea [mm^2]": aleafletarea.astype('float64'),
-                "leafletangle [deg]": aleafletangle.astype('float64'),
             },
             "posterior": {
                 "leafletlength [mm]": pleafletlength.astype('float64'),
                 "leafletheight [mm]": pleafletheight.astype('float64'),
                 "leafletarea [mm^2]": pleafletarea.astype('float64'),
-            },
-            "tenting": {
-                "height [mm]": tentingheight.astype('float64'),
-                "area [mm^2]": tentingarea.astype('float64'),
-                "volume [mm^3]": tentingvolume.astype('float64'),
-
             },
         }
     }
@@ -264,7 +198,7 @@ def main(args):
 
         soapfilmannulus = soapfilmannulusinterpolation(annulus_pd, annulus_skeleton)
 
-        bestfitplane, referenceplane, n, ctr, r = planefit(annulus_pd)
+        bestfitplane, referenceplane, n, ctr = planefit(annulus_pd)
 
         try:
             landmarks = landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr,
@@ -273,7 +207,7 @@ def main(args):
             print('The segmentation mask is not sufficiently accurate to be processed')
             break
 
-        _ = anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ctr, r, referenceplane,
+        _ = anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, referenceplane,
                                   aleaflet_pd, pleaflet_pd, landmarks, args.odir, args.mask, iname)
 
 

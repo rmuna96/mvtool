@@ -365,7 +365,7 @@ def planefit(annulus_pd, plot=False):
         pl.add_mesh(bestfitdisc)
         pl.show()
 
-    return bestfitdisc, bestfitplane, n, ctr
+    return bestfitdisc, bestfitplane, n, ctr, r
 
 
 def clmodeling(fitplane, annulus_skeleton, aleaflet_pd, normal, center, plot=False):
@@ -408,6 +408,34 @@ def clmodeling(fitplane, annulus_skeleton, aleaflet_pd, normal, center, plot=Fal
         pl.show()
 
     return coaptation_line, saddle_horn
+
+
+def anter_postsplit(annulus_skeleton, ctr, n, direction, anterior_posteriorplane, plot=False):
+
+    lateral_plane = anterior_posteriorplane.rotate_vector(vector=n, angle=72, point=ctr, inplace=True)
+    medial_plane = anterior_posteriorplane.rotate_vector(vector=n, angle=-72, point=ctr, inplace=True)
+
+    lateral2medial = annulus_skeleton.clip_surface(lateral_plane)
+
+    if np.dot(lateral_plane.cell_normals[0], direction) < 0:
+        lateral2medial = annulus_skeleton.clip_surface(lateral_plane, invert=True)
+
+    medial2lateral = lateral2medial.clip_surface(medial_plane)
+
+    if np.dot(medial_plane.cell_normals[0], direction) < 0:
+        medial2lateral = annulus_skeleton.clip_surface(medial_plane, invert=True)
+
+    medialcommisure_pt, lateralcommisure_pt = medial2lateral.points[0], medial2lateral.points[-1]
+
+    if plot:
+
+        pl = pv.Plotter()
+        pl.add_mesh(annulus_skeleton)
+        pl.add_mesh(medialcommisure_pt)
+        pl.add_mesh(lateralcommisure_pt)
+        pl.show()
+
+    return medialcommisure_pt, lateralcommisure_pt
 
 
 def vtk2sitk(vtkimg, debug=False):
