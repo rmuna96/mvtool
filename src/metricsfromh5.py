@@ -20,6 +20,9 @@ from utils import (
     anter_postsplit,
     distancebtwpolydata)
 
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 
 def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr, aleaflet_pd, pleaflet_pd,
                       plot=False):
