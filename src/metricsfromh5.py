@@ -206,28 +206,28 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
 
     metrics = {
         "annulus": {
-            "anteriorposteriodiameter [mm]": anteriorposteriod.astype('float64'),
-            "mediallateraldiameter [mm]": mediallaterald.astype('float64'),
-            "intertrigonaldist [mm]": itdist.astype('float64'),
-            "commissuralwidth [mm]": commissuralwidth.astype('float64'),
-            "annularheight [mm]": annularheight.astype('float64'),
-            "annularcircumference [mm]": annularcirc.astype('float64'),
-            "sphericityindex": ci.astype('float64'),
-            "nonplanarangle [deg]": NPA.astype('float64'),
-            "annulararea2d [mm^2]": annulararea2d.astype('float64'),
-            "annulararea [mm^2]": annulararea.astype('float64'),
+            "antero-posterior (AP) distance [mm]": anteriorposteriod.astype('float64'),
+            "anterolateral-posteriormedial (AL-PM) distance [mm]": mediallaterald.astype('float64'),
+            "intertrigonal (IT) distance [mm]": itdist.astype('float64'),
+            "commissuralwidth (CW) [mm]": commissuralwidth.astype('float64'),
+            "annular height (AH) [mm]": annularheight.astype('float64'),
+            "annular perimeter [mm]": annularcirc.astype('float64'),
+            "sphericity index (SI)": ci.astype('float64'),
+            "non-planar angle (NAP) [deg]": NPA.astype('float64'),
+            "annular area 2D [mm^2]": annulararea2d.astype('float64'),
+            "annular area 3D [mm^2]": annulararea.astype('float64'),
         },
         "lealet": {
             "anterior": {
-                "leafletlength [mm]": aleafletlength.astype('float64'),
-                "leafletheight [mm]": aleafletheight.astype('float64'),
-                "leafletarea [mm^2]": aleafletarea.astype('float64'),
-                "leafletangle [deg]": aleafletangle.astype('float64'),
+                "leaflet length [mm]": aleafletlength.astype('float64'),
+                "leaflet billowing height [mm]": aleafletheight.astype('float64'),
+                "leaflet surface area [mm^2]": aleafletarea.astype('float64'),
+                "leaflet angle [deg]": aleafletangle.astype('float64'),
             },
             "posterior": {
-                "leafletlength [mm]": pleafletlength.astype('float64'),
-                "leafletheight [mm]": pleafletheight.astype('float64'),
-                "leafletarea [mm^2]": pleafletarea.astype('float64'),
+                "leaflet length [mm]": pleafletlength.astype('float64'),
+                "leaflet billowing height [mm]": pleafletheight.astype('float64'),
+                "leaflet surface area [mm^2]": pleafletarea.astype('float64'),
             },
             "tenting": {
                 "height [mm]": tentingheight.astype('float64'),
@@ -278,9 +278,9 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--idir', type=str, default='./images', help='input directory')
-    parser.add_argument('--odir', type=str, default='./metrics', help='output directory')
-    parser.add_argument('--mask', type=str, default='target', help='mask to be processed')
+    parser = argparse.ArgumentParser(description='Compute metrics from segmentation mask')
+    parser.add_argument('idir', type=str, default='./images', help='input directory')
+    parser.add_argument('odir', type=str, default='./metrics', help='output directory')
+    parser.add_argument('--mask', type=str, default='target', help='mask to be processed (target o prediction)')
     args = parser.parse_args()
     main(args)
