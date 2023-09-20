@@ -1,0 +1,6 @@
+numpy == 1.22.3
+vtk == 9.1.0
+pyvista == 0.39.1
+SimpleITK == 2.1.1
+h5py == 3.9.0
+scipy == 1.5.4
