@@ -68,7 +68,7 @@ The output is a json file with all the computed metrics as shown below:
     "annulus": {
         "antero-posterior (AP) distance [mm]": 38.02983474731445,
         "anterolateral-posteriormedial (AL-PM) distance [mm]": 35.96678161621094,
-        "intertrigonal (IT) distance [mm]": 3.353177976299147e+32,
+        "intertrigonal (IT) distance [mm]": 35.53448298298349,
         "commissuralwidth (CW) [mm]": 35.9667854309082,
         "annular height (AH) [mm]": 9.45460577827402,
         "annular perimeter [mm]": 122.0244140625,
