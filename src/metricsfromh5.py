@@ -156,7 +156,7 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
     annularheight = highest_positived - highest_negatived
 
     # ---> Compute inter-trigonal distance
-    itdist = 19.280 * np.exp(2 * mediallaterald)    #compute according [2]
+    itdist = 19.280 * np.exp(0.017 * mediallaterald)    #compute according [1]
 
     # ---> Comnpute sphericity index
     ci = anteriorposteriod/commissuralwidth
