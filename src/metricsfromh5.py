@@ -8,9 +8,11 @@ import argparse
 import json
 import os
 from os.path import join
+
 import numpy as np
 import pyvista as pv
-from utils import (
+
+from functions import (
     h52vtk,
     getmodelfromlabelmask,
     splinefit,
@@ -20,6 +22,7 @@ from utils import (
     anter_postsplit,
     distancebtwpolydata)
 
+from utils import Logger
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -250,6 +253,8 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
 
 def main(args):
 
+    logger = Logger(join(args.odir, args.mask), 'logs').get_logger()
+
     filenames = os.listdir(join(args.idir))
 
     for fn in filenames:
@@ -273,8 +278,8 @@ def main(args):
             landmarks = landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr,
                                           aleaflet_pd, pleaflet_pd, plot=False)
         except Exception:
-            print('The segmentation mask is not sufficiently accurate to be processed')
-            break
+            logger.info(f'{iname} is not sufficiently accurate to be processed')
+            continue
 
         _ = anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ctr, r, referenceplane,
                                   aleaflet_pd, pleaflet_pd, landmarks, args.odir, args.mask, iname)
