@@ -27,37 +27,35 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr, aleaflet_pd, pleaflet_pd,
+def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr, r, aleaflet_pd, pleaflet_pd,
                       plot=False):
     """
         Detect anatomical landmarks for mitral valve anatomy
         quantification.
     """
-    coaptationline, saddlehorn = clmodeling(bestfitplane, annulus_skeleton, aleaflet_pd, n, ctr, plot=False)
-
-    _, saddlehorn_onplane = bestfitplane.find_closest_cell(saddlehorn, return_closest_point=True)
+    (coaptationline, saddlehorn, saddlehorn_onplane, bestfitplane,
+     referenceplane, n, anterior_posteriorplane) = clmodeling(
+        bestfitplane, referenceplane, annulus_skeleton, aleaflet_pd, n, ctr, r, plot=plot)
 
     # ---> Define clipping planes
-    direction = ctr - saddlehorn_onplane
-    medial_lateralplane = referenceplane.copy()
-    medial_lateralplane.rotate_vector(vector=direction, angle=90, point=ctr, inplace=True)
-    anterior_posteriorplane = medial_lateralplane.copy()
-    anterior_posteriorplane.rotate_vector(vector=n, angle=90, point=ctr, inplace=True)
+    direction = saddlehorn_onplane - ctr
+    medial_lateralplane = anterior_posteriorplane.copy()
+    medial_lateralplane.rotate_vector(vector=n, angle=90, point=ctr, inplace=True)
 
     # ---> Idenitfy anterior, posterior, medial and lateral annulus portion
-    annulusanterior_pd = annulus_skeleton.clip_surface(anterior_posteriorplane)
-    annulusposterior_pd = annulus_skeleton.clip_surface(anterior_posteriorplane, invert=False)
+    annulusanterior_pd = annulus_skeleton.clip_surface(medial_lateralplane, invert=False)
+    annulusposterior_pd = annulus_skeleton.clip_surface(medial_lateralplane)
 
     lateral_pt, medial_pt = annulusanterior_pd.points[0], annulusanterior_pd.points[-1]
 
     # ---> Find posterior horn
-    posteriorhorn = annulusposterior_pd.slice(normal=medial_lateralplane.face_normals[0]).points[0]
+    posteriorhorn = annulusposterior_pd.slice(normal=anterior_posteriorplane.face_normals[0]).points[0]
 
     _, posteriorhorn_onplane = bestfitplane.find_closest_cell(posteriorhorn, return_closest_point=True)
 
     # ---> Define anterior and posterior portion (2/5 - 3/5 rule)
     medialcommisure_pt, lateralcommisure_pt = anter_postsplit(annulus_skeleton, ctr, n, direction,
-                                                              anterior_posteriorplane, plot=False)
+                                                              anterior_posteriorplane, plot=plot)
 
     cw_midpt = 0.5 * (medialcommisure_pt + lateralcommisure_pt)
 
@@ -67,12 +65,12 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     ap_plane = ml_plane.copy()
     ap_plane.rotate_vector(vector=n, angle=90, point=ctr, inplace=True)
 
-    aleaflet_slice = aleaflet_pd.slice(normal=medial_lateralplane.face_normals[0])
+    aleaflet_slice = aleaflet_pd.slice(normal=anterior_posteriorplane.face_normals[0])
     cpoint_idx = np.argmax(np.linalg.norm(aleaflet_slice.points - saddlehorn, axis=1))
     aleaflet_cpoint = aleaflet_slice.points[cpoint_idx]
 
     # ---> Find posterior point, leaflet coaptation point
-    pleaflet_slice = pleaflet_pd.slice(normal=medial_lateralplane.face_normals[0])
+    pleaflet_slice = pleaflet_pd.slice(normal=anterior_posteriorplane.face_normals[0])
     cpoint_idx = np.argmax(np.linalg.norm(pleaflet_slice.points - posteriorhorn, axis=1))
     pleaflet_cpoint = pleaflet_slice.points[cpoint_idx]
 
@@ -275,8 +273,8 @@ def main(args):
         bestfitplane, referenceplane, n, ctr, r = planefit(annulus_pd)
 
         try:
-            landmarks = landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr,
-                                          aleaflet_pd, pleaflet_pd, plot=False)
+            landmarks = landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr, r,
+                                          aleaflet_pd, pleaflet_pd, plot=True)
         except Exception:
             logger.info(f'{iname} is not sufficiently accurate to be processed')
             continue
