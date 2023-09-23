@@ -7,6 +7,7 @@ import pyvista as pv
 import scipy
 from scipy.interpolate import splprep, splev
 from scipy.spatial.transform import Rotation
+from scipy.spatial import KDTree
 from math import cos, sin, sqrt
 
 
@@ -368,28 +369,39 @@ def planefit(annulus_pd, plot=False):
     return bestfitdisc, bestfitplane, n, ctr, r
 
 
-def clmodeling(fitplane, annulus_skeleton, aleaflet_pd, normal, center, plot=False):
+def clmodeling(fitplane, referanceplane, annulus_skeleton, aleaflet_pd, normal, center, radius, plot=False):
     """
         Model and localize the coaptation line by finding the free
         margin of the anterior leaflet. Return the coaptation line
         model as polydata and the saddle horn coordinates.
     """
-    # ---> Find Saddle Horn
+    # ---> Find Saddle Horn and projected Saddle Horn on plane
     annulus_skeleton.compute_implicit_distance(fitplane, inplace=True)
-    dist = annulus_skeleton["implicit_distance"]
-    if np.dot(normal, fitplane.cell_normals[0]) < 0:
-        saddle_horn_distance = np.min(dist)
-    else:
-        saddle_horn_distance = np.max(dist)
-    saddle_horn_idx = np.where(dist == saddle_horn_distance)
-    saddle_horn = annulus_skeleton.points[saddle_horn_idx[0][0]]
-    _, projected_point = fitplane.find_closest_cell(saddle_horn, return_closest_point=True)
+    dist2annulus = annulus_skeleton["implicit_distance"]
 
-    ap_plane = fitplane.rotate_vector(vector=projected_point - center, angle=90, point=center)
+    max_dist2annulus = np.max(dist2annulus)
+    min_dist2annulus = np.min(dist2annulus)
+
+    if np.abs(max_dist2annulus) > np.abs(min_dist2annulus):
+        saddle_horn = annulus_skeleton.points[np.argmax(dist2annulus)]
+        sh2plane = fitplane.points[np.argmin(np.linalg.norm(fitplane.points - saddle_horn, axis=1))]
+
+    else:
+        saddle_horn = annulus_skeleton.points[np.argmin(dist2annulus)]
+        sh2plane = fitplane.points[np.argmin(np.linalg.norm(fitplane.points - saddle_horn, axis=1))]
+
+        # fix normal (it must always point upward)
+        normal = -1 * normal
+        fitplane = pv.Disc(center=center, outer=radius, inner=0, normal=normal, r_res=50, c_res=50)
+        referanceplane = pv.Disc(center=center, outer=radius * 1.5, inner=0, normal=normal, r_res=50, c_res=50)
+
+    ap_plane = fitplane.copy()
+    ap_plane.rotate_vector(vector=sh2plane - center, angle=90, point=center, inplace=True)
 
     coaptation_pts = []
     for i, angle in enumerate(range(-40, 45)):
-        slice_plane = ap_plane.rotate_vector(vector=normal, angle=angle, point=saddle_horn)
+        slice_plane = ap_plane.copy()
+        slice_plane.rotate_vector(vector=normal, angle=angle, point=saddle_horn, inplace=True)
         idx = np.argmax(np.linalg.norm(aleaflet_pd.slice(normal=slice_plane.cell_normals[0], origin=saddle_horn
                                                          ).points - saddle_horn, axis=1), axis=0)
         coaptation_pts.append(aleaflet_pd.slice(normal=slice_plane.cell_normals[0], origin=saddle_horn).points[idx])
@@ -405,32 +417,40 @@ def clmodeling(fitplane, annulus_skeleton, aleaflet_pd, normal, center, plot=Fal
         pl.add_mesh(annulus_skeleton)
         pl.add_mesh(coaptation_line)
         pl.add_mesh(saddle_horn)
+        pl.add_points(sh2plane)
         pl.show()
 
-    return coaptation_line, saddle_horn
+    return coaptation_line, saddle_horn, sh2plane, fitplane, referanceplane, normal, ap_plane
 
 
 def anter_postsplit(annulus_skeleton, ctr, n, direction, anterior_posteriorplane, plot=False):
 
-    lateral_plane = anterior_posteriorplane.rotate_vector(vector=n, angle=72, point=ctr, inplace=True)
-    medial_plane = anterior_posteriorplane.rotate_vector(vector=n, angle=-72, point=ctr, inplace=True)
+    lateral_plane = anterior_posteriorplane.copy()
+    lateral_plane.rotate_vector(vector=n, angle=72, point=ctr, inplace=True, transform_all_input_vectors=True)
+    medial_plane = anterior_posteriorplane.copy()
+    medial_plane.rotate_vector(vector=n, angle=-72, point=ctr, inplace=True, transform_all_input_vectors=True)
 
-    lateral2medial = annulus_skeleton.clip_surface(lateral_plane)
+    lateral2medial = annulus_skeleton.clip_surface(lateral_plane, invert=False)
 
     if np.dot(lateral_plane.cell_normals[0], direction) < 0:
-        lateral2medial = annulus_skeleton.clip_surface(lateral_plane, invert=True)
+        lateral2medial = annulus_skeleton.clip_surface(lateral_plane)
 
-    medial2lateral = lateral2medial.clip_surface(medial_plane)
+    medial2lateral = lateral2medial.clip_surface(medial_plane, invert=False)
 
     if np.dot(medial_plane.cell_normals[0], direction) < 0:
-        medial2lateral = annulus_skeleton.clip_surface(medial_plane, invert=True)
+        medial2lateral = lateral2medial.clip_surface(medial_plane)
 
     medialcommisure_pt, lateralcommisure_pt = medial2lateral.points[0], medial2lateral.points[-1]
 
     if plot:
 
         pl = pv.Plotter()
-        pl.add_mesh(annulus_skeleton)
+        pl.add_mesh(medial2lateral)
+        pl.add_mesh(medial_plane)
+        pl.add_mesh(lateral_plane)
+        pl.add_mesh(pv.Arrow(start=ctr, direction=direction))
+        pl.add_mesh(pv.Arrow(start=ctr, direction=medial_plane.cell_normals[0]))
+        pl.add_mesh(pv.Arrow(start=ctr, direction=lateral_plane.cell_normals[0]))
         pl.add_mesh(medialcommisure_pt)
         pl.add_mesh(lateralcommisure_pt)
         pl.show()
