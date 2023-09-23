@@ -35,7 +35,7 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     """
     (coaptationline, saddlehorn, saddlehorn_onplane, bestfitplane,
      referenceplane, n, anterior_posteriorplane) = clmodeling(
-        bestfitplane, referenceplane, annulus_skeleton, aleaflet_pd, n, ctr, r, plot=True)
+        bestfitplane, referenceplane, annulus_skeleton, aleaflet_pd, n, ctr, r, plot=False)
 
     # ---> Define clipping planes
     direction = saddlehorn_onplane - ctr
