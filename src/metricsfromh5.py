@@ -35,7 +35,7 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     """
     (coaptationline, saddlehorn, saddlehorn_onplane, bestfitplane,
      referenceplane, n, anterior_posteriorplane) = clmodeling(
-        bestfitplane, referenceplane, annulus_skeleton, aleaflet_pd, n, ctr, r, plot=plot)
+        bestfitplane, referenceplane, annulus_skeleton, aleaflet_pd, n, ctr, r, plot=True)
 
     # ---> Define clipping planes
     direction = saddlehorn_onplane - ctr
@@ -55,7 +55,7 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
 
     # ---> Define anterior and posterior portion (2/5 - 3/5 rule)
     medialcommisure_pt, lateralcommisure_pt = anter_postsplit(annulus_skeleton, ctr, n, direction,
-                                                              anterior_posteriorplane, plot=plot)
+                                                              anterior_posteriorplane, plot=False)
 
     cw_midpt = 0.5 * (medialcommisure_pt + lateralcommisure_pt)
 
@@ -75,8 +75,9 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
     pleaflet_cpoint = pleaflet_slice.points[cpoint_idx]
 
     # ---> Find coaptation point
-    _, clpts_onplane = bestfitplane.find_closest_cell(coaptationline.points, return_closest_point=True)
-    coapt_pt = coaptationline.points[np.argmax(np.linalg.norm(coaptationline.points - clpts_onplane, axis=1))]
+    ant_postonplane = pv.Line(saddlehorn_onplane, posteriorhorn_onplane)
+    _, clpts_online = ant_postonplane.find_closest_cell(coaptationline.points, return_closest_point=True)
+    coapt_pt = coaptationline.points[np.argmax(np.linalg.norm(coaptationline.points - clpts_online, axis=1))]
 
     landmarks = {
         "annulus": {
@@ -94,7 +95,7 @@ def landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane
             "aleafletcpoint": aleaflet_cpoint,
             "pleafletcpoint": pleaflet_cpoint,
             "clpoints": coaptationline.points,
-            "clptsonplane": clpts_onplane,
+            "clptsonline": clpts_online,
             "coaptpt": coapt_pt,
         }
     }
@@ -186,15 +187,12 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
     # ---> Compute tenting height, tenting area and tentng volume
 
     tentingheight = np.max(np.linalg.norm(landmarks["leaflet"]["clpoints"] -
-                                                                         landmarks["leaflet"]["clptsonplane"], axis=1))
-    tentingarea = pv.PolyData([
-        landmarks["annulus"]["saddlehornonplane"],
-        landmarks["annulus"]["posteriorhornonplane"],
-        landmarks["leaflet"]["coaptpt"],
-    ], strips=[3, 1, 2, 3]).area
+                                                                         landmarks["leaflet"]["clptsonline"], axis=1))
+    tentingarea = 0.5 * (
+            np.linalg.norm(landmarks["annulus"]["saddlehornonplane"] - landmarks["annulus"]["posteriorhornonplane"]
+                           )) * tentingheight
 
-    tentingvolume = 1/3 * np.pi * r ** 2 * np.dot(-n, (landmarks["leaflet"]["coaptpt"]-ctr)/np.linalg.norm(
-        landmarks["leaflet"]["coaptpt"]-ctr)) * np.linalg.norm(landmarks["leaflet"]["coaptpt"]-ctr)
+    tentingvolume = 1/3 * np.pi * r ** 2 * tentingheight
 
     ba = landmarks["annulus"]["saddlehornonplane"] - landmarks["leaflet"]["coaptpt"]
     bc = landmarks["annulus"]["saddlehornonplane"] - landmarks["annulus"]["posteriorhornonplane"]
@@ -232,6 +230,7 @@ def anatomyquantification(annulus_skeleton, soapfilmannulus, bestfitplane, n, ct
                 "leaflet length [mm]": pleafletlength.astype('float64'),
                 "leaflet billowing height [mm]": pleafletheight.astype('float64'),
                 "leaflet surface area [mm^2]": pleafletarea.astype('float64'),
+                "leaflet angle [deg]": pleafletangle.astype('float64'),
             },
             "tenting": {
                 "height [mm]": tentingheight.astype('float64'),
@@ -274,7 +273,7 @@ def main(args):
 
         try:
             landmarks = landmarkdetection(annulus_pd, annulus_skeleton, bestfitplane, referenceplane, n, ctr, r,
-                                          aleaflet_pd, pleaflet_pd, plot=True)
+                                          aleaflet_pd, pleaflet_pd, plot=False)
         except Exception:
             logger.info(f'{iname} is not sufficiently accurate to be processed')
             continue

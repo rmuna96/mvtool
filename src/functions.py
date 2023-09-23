@@ -418,6 +418,7 @@ def clmodeling(fitplane, referanceplane, annulus_skeleton, aleaflet_pd, normal, 
         pl.add_mesh(coaptation_line)
         pl.add_mesh(saddle_horn)
         pl.add_points(sh2plane)
+        pl.add_mesh(pv.Arrow(center, normal, scale=10))
         pl.show()
 
     return coaptation_line, saddle_horn, sh2plane, fitplane, referanceplane, normal, ap_plane
