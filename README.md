@@ -18,9 +18,13 @@ Refer to `requirements.txt` for the list of required Python packages.
 ### Compute morphological metrics from multi-class (anterior and posterior leaflet) MV segmentation
 
 Run the following command:\
-`$ python metricsfromnifti.py [OPTIONS] IDIR ODIR`\  
+`$ python metricsfromnifti.py [OPTIONS] IDIR ODIR`  
 For more details, use:\
 `$ python metricsfromnifti.py -h`.
+
+Alternatively,    
+`$ python metricsfromh5.py [OPTIONS] IDIR ODIR`\
+for NTNU collaboation.
 
 This tool computes morphological metrics based on the provided segmentation mask (target or prediction). 
 The anatomical landmarks and metric definitions are based on  [[1]](#1). The metrics include:
