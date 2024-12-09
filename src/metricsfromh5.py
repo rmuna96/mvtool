@@ -1,7 +1,8 @@
 """
 Tool box to extract morphological metrics from multi-class (anterior and posterior leaflet)
 segmentation mask of mitral valve from 3DTEE. Version of the tool box for NTNU-Polimi
-collaboration.
+collaboration. For this case segmentation mask contains only two labels, anterior and posterior
+leaflet.
 """
 
 import argparse
@@ -15,7 +16,7 @@ import pyvista as pv
 from functions import (
     h52vtk,
     getmodelfromlabelmask,
-    splinefit,
+    annulusannotation,
     soapfilmannulusinterpolation,
     planefit,
     clmodeling,
@@ -265,7 +266,7 @@ def main(args):
             aleaflet_pd = getmodelfromlabelmask(prediction, 1, [1, 1])
             pleaflet_pd = getmodelfromlabelmask(prediction, 1, [2, 2])
 
-        annulus_pd, annulus_skeleton = splinefit(aleaflet_pd, pleaflet_pd)
+        annulus_pd, annulus_skeleton = annulusannotation(aleaflet_pd, pleaflet_pd)
 
         soapfilmannulus = soapfilmannulusinterpolation(annulus_pd, annulus_skeleton)
 
