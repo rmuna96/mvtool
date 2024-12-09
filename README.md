@@ -2,23 +2,28 @@
 
 ## Extract morphological metrics from multi-class segmentation of mitral valve from 3D ultrasound.
 
-This repository is intended to be used to validate the performance of deep learning models for automatic mitral valve 
-segmentation from 3D ultrasound by automatically measuring metrics commonly used in the clinic to characterize mitral 
-valve morphology at the end-systole (ES) frame.
+This repository is designed to validate the performance of deep learning models 
+for automatic mitral valve segmentation from 3D ultrasound data. It provides 
+tools to automatically measure clinically relevant metrics that are commonly used 
+to characterize mitral valve morphology during the end-systole (ES) phase. 
+These metrics are crucial in clinical settings for assessing the anatomy and 
+function of the mitral valve.
 
 ## Requirements
 
-See `requirements.txt` for all needed Python packages.
+Refer to `requirements.txt` for the list of required Python packages.
 
 ## Usage
 
 ### Compute morphological metrics from multi-class (anterior and posterior leaflet) MV segmentation
 
-`$ python metricsfromh5.py [OPTIONS] IDIR ODIR`. For more information see `$ python metricsfromh5.py -h`.
+Run the following command:\
+`$ python metricsfromnifti.py [OPTIONS] IDIR ODIR`\  
+For more details, use:\
+`$ python metricsfromnifti.py -h`.
 
-This will compute morphological metrics according to the proivded segmentation mask (target or prediction). The 
-definitions of the anatomical landmarks and the metrics were taken from [[1]](#1). All the metrics computed by this 
-tool are reported below:
+This tool computes morphological metrics based on the provided segmentation mask (target or prediction). 
+The anatomical landmarks and metric definitions are based on  [[1]](#1). The metrics include:
 * Annulus
   - antero-posterior (AP) distance [mm]
   - anterolateral-posteriormedial (AL-PM) distance [mm]
@@ -39,7 +44,21 @@ tool are reported below:
   - tenting area [mm<sup>2</sup>]
   - tenting volume [mm<sup>3</sup>]
 
-All the input data must be HDF files with the following structure:
+### Input Data Requirements
+#### Multi-Class Segmentation Masks
+* Format: NIfTI
+* Labels:
+  * 0: Annulus
+  * 1: Anterior Leaflet
+  * 2: Posterior Leaflet\
+
+#### Alternative Input (for NTNU Collaboration):
+* Format: NIfTI
+* Labels:
+  * 0: Anterior Leaflet
+  * 1: Posterior Leaflet
+* Folder Structure:
+  
 ```
 |-- Input/
     |-- vol01
@@ -62,7 +81,10 @@ All the input data must be HDF files with the following structure:
     |-- origin
     |-- resolution
 ```
-The output is a json file with all the computed metrics as shown below:
+
+### Output
+The output is a JSON file with all computed metrics. Example:
+
 ```JSON
 {
     "annulus": {
