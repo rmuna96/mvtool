@@ -173,7 +173,7 @@ def rotationmatrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
-def splinefit(aleaflet_pd, pleaflet_pd, plot=False):
+def annulusannotation(aleaflet_pd, pleaflet_pd, plot=False):
     """
         Delinate the perimeter of mitral valve leaflets and reconstruct the annulus
         model.
@@ -232,47 +232,94 @@ def splinefit(aleaflet_pd, pleaflet_pd, plot=False):
     return fittedspline, fittedspline_reference
 
 
+def splineannulusfitting(annulus_pd, plot=False):
+    """
+        Spline interpolation by interpolating intersection points between annulus and rotating sphere
+    """
+
+    points = annulus_pd.points.T
+    assert points.shape[0] <= points.shape[1], "There are only {} points in {} dimensions.".format(points.shape[1],
+                                                                                                   points.shape[0])
+    ctr = points.mean(axis=1)
+    x = points - ctr[:, np.newaxis]
+    m = np.dot(x, x.T)
+    n = np.linalg.svd(m)[0][:, -1]  # normal direction
+    r = np.linalg.svd(m)[0][:, 1]  # radial direction
+    rot_90 = rotationmatrix(n, np.deg2rad(90))  # rotation matrix
+    alpha = 20
+    p = 0
+    angular_offset = 20  # degrees
+    l_rawspline = int(380 / angular_offset)  # spline length
+    points_rawspline = np.zeros((l_rawspline, 3))
+    while alpha < 400:
+        alpha_rad = np.deg2rad(alpha)
+        rot_alpha = rotationmatrix(n, alpha_rad)  # rotation matrix
+        r_rot = np.dot(rot_alpha, r)  # rotating radial direction
+        r_vec = ctr - 20 * r_rot
+        rot_disc = pv.Disc(center=r_vec + 10 * (r_vec - ctr) / np.linalg.norm(r_vec - ctr),
+                           outer=2 * np.linalg.norm(r_vec - ctr),
+                           normal=np.dot(rot_90, r_rot), c_res=50)
+        box = rot_disc.extrude(np.dot(rot_90, r_rot), capping=True)
+        selected = annulus_pd.select_enclosed_points(box)
+        ptscloud = annulus_pd.extract_points(selected['SelectedPoints'].view(bool),
+                                             adjacent_cells=False)
+        center = np.transpose(ptscloud.points).mean(axis=1)
+        points_rawspline[p] = center
+
+        alpha += 20
+        p += 1
+
+    points_rawspline = points_rawspline[~np.isnan(points_rawspline)]
+    points_rawspline = points_rawspline.reshape(int(points_rawspline.shape[0] / 3), 3)
+
+    tck, u = splprep(points_rawspline.T, u=None, k=5, s=20, per=1)
+    fittedpoints = splev(np.linspace(u.min(), u.max(), 1000), tck)
+
+    points_fittedspline = np.array(fittedpoints).T
+
+    fittedspline_reference = pv.Spline(points_fittedspline)
+    fittedspline = fittedspline_reference.tube(radius=1)
+
+    if plot:
+        pl = pv.Plotter()
+        pl.add_mesh(annulus_pd, opacity=0.4)
+        pl.add_mesh(fittedspline, opacity=0.4)
+        pl.add_mesh(fittedspline_reference, color='red')
+        pl.show()
+
+    return fittedspline, fittedspline_reference
+
+
 def soapfilmannulusinterpolation(annulus_pd, annulus_skeleton, plot=False):
     """
         Compute 3D surface interpolating the annulus. Inputs are rotated to have principal
         directions coherent with the x, y, z axes.
     """
 
-    points = annulus_pd.points.T
-    ctr = points.mean(axis=1)
-    x = points - ctr[:, np.newaxis]
-    m = np.dot(x, x.T)
-    pdirs = np.linalg.svd(m)[0]
-
-    r, _, = Rotation.align_vectors(pdirs, np.eye(3))
-
-    rot_matrix = np.vstack([np.hstack([r.as_matrix(), np.expand_dims([0, 0, 0], 0).T]), np.array([0, 0, 0, 1])])
-
-    annulus_rot = annulus_pd.transform(rot_matrix, transform_all_input_vectors=True, inplace=False)
-    annulus_skeleton_rot = annulus_skeleton.transform(rot_matrix, transform_all_input_vectors=True, inplace=False)
+    ctr = np.mean(annulus_pd.points, axis=0)
 
     # ---> Define the mesh grid on the annulus
-    x_probe, y_probe, z_probe = annulus_rot.points.T[0], annulus_rot.points.T[1], annulus_rot.points.T[2]
+    x_probe, y_probe, z_probe = annulus_pd.points.T[0], annulus_pd.points.T[1], annulus_pd.points.T[2]
 
     xi, yi = np.linspace(x_probe.min(), x_probe.max(), 400), np.linspace(y_probe.min(), y_probe.max(), 400)
     xi, yi = np.meshgrid(xi, yi)
 
     # ---> Sample point for the interpolation
-    choice = np.arange(0, annulus_rot.points.T[0].shape[0], annulus_rot.points.T[0].shape[0] / 4000, dtype=int)
+    choice = np.arange(0, annulus_pd.points.T[0].shape[0], annulus_pd.points.T[0].shape[0] / 4000, dtype=int)
     spline = scipy.interpolate.Rbf(x_probe[choice], y_probe[choice], z_probe[choice], function='thin_plate', smooth=250)
     zi = spline(xi, yi)
 
     # ---> Create a pyvista grid from the interpolated point
     grid = pv.StructuredGrid(xi, yi, zi)
 
-    extruded_annulus = annulus_skeleton_rot.extrude([0, 0, 10], capping=False)
+    extruded_annulus = annulus_skeleton.extrude([0, 0, 10], capping=False)
     extruded_annulus.extrude([0, 0, -10], inplace=True, capping=False)
+
     if np.dot(extruded_annulus.points[0] - ctr, extruded_annulus.cell_normals[0]) < 0:
         film = grid.clip_surface(extruded_annulus, invert=False)
     else:
         film = grid.clip_surface(extruded_annulus, invert=True)
     film = film.connectivity(largest=True)
-    film.transform(rot_matrix.T, transform_all_input_vectors=True, inplace=True)
 
     if plot:
         pl = pv.Plotter()
@@ -457,6 +504,30 @@ def anter_postsplit(annulus_skeleton, ctr, n, direction, anterior_posteriorplane
         pl.show()
 
     return medialcommisure_pt, lateralcommisure_pt
+
+
+def trans2canonical(annulus_pd, aleaflet_pd, pleaflet_pd):
+    """
+        Reorient segmentation mask according to the canonical
+        reference system. Annular plane direction aligns as the
+        Z-axis with annular center point in the origin.
+    """
+
+    points = annulus_pd.points.T
+    ctr = points.mean(axis=1)
+    x = points - ctr[:, np.newaxis]
+    m = np.dot(x, x.T)
+    pdirs = np.linalg.svd(m)[0]
+
+    r, _, = Rotation.align_vectors(pdirs, np.eye(3))
+
+    rot_matrix = np.vstack([np.hstack([r.as_matrix(), np.expand_dims([0, 0, 0], 0).T]), np.array([0, 0, 0, 1])])
+
+    annulus_pd.transform(rot_matrix, transform_all_input_vectors=True, inplace=True)
+    aleaflet_pd.transform(rot_matrix, transform_all_input_vectors=True, inplace=True)
+    pleaflet_pd.transform(rot_matrix, transform_all_input_vectors=True, inplace=True)
+
+    return annulus_pd, aleaflet_pd, pleaflet_pd
 
 
 def vtk2sitk(vtkimg, debug=False):
